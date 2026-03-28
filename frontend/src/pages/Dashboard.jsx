@@ -55,7 +55,7 @@ export default function Dashboard({ user }) {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const response = await axios.post('/analyze', formData, {
+      const response = await axios.post('http://localhost:8000/analyze', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 120000,
       });
