@@ -3,7 +3,7 @@
  * Routes: / → Landing, /login → Auth, /signup → Auth, /dashboard → Protected Dashboard
  */
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import { supabase } from './supabaseClient';
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
@@ -38,7 +38,7 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/" element={<LandingPage user={user} />} />
         <Route path="/login" element={<AuthPage mode="login" />} />
@@ -52,6 +52,6 @@ export default function App() {
           }
         />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
