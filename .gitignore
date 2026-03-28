@@ -1,0 +1,36 @@
+# Castellan — Ignore Rules
+
+# Python & Backend
+backend/env/
+backend/__pycache__/
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/*.pyc
+backend/.pytest_cache/
+backend/.venv/
+backend/venv/
+
+# Node & Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# Git Submodules / Repos (if we want to push them as code)
+# Note: we will remove .git from these to push code directly
+# !backend/model/deepfakesONphys/
+# !backend/model/rppg_toolbox/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.bak

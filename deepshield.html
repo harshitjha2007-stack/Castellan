@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Castellan — AI Deepfake Detection</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   ROOT & RESET
+═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:          #0A0A0A;
+  --bg2:         #0F0F0F;
+  --glass:       rgba(255,255,255,0.04);
+  --glass-b:     rgba(255,255,255,0.08);
+  --glass-bs:    rgba(255,255,255,0.13);
+  --tp:          #F0EFFF;
+  --ts:          rgba(240,239,255,0.55);
+  --tm:          rgba(240,239,255,0.30);
+  --blue:        #4F8EF7;
+  --purple:      #9B6EFA;
+  --danger:      #FF5A6E;
+  --success:     #3DEBB1;
+  --warn:        #F7A440;
+  --r-sm:  12px;
+  --r-md:  16px;
+  --r-lg:  22px;
+  --r-xl:  28px;
+  --r-pill:100px;
+}
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  background-image: radial-gradient(circle, rgba(255,255,255,0.065) 1px, transparent 1px);
+  background-size: 28px 28px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--tp);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+a { color: inherit; text-decoration: none; }
+ul { list-style: none; }
+img { display: block; max-width: 100%; }
+button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
+input, textarea { font-family: 'DM Sans', sans-serif; }
+
+/* ═══════════════════════════════════════════
+   PAGES
+═══════════════════════════════════════════ */
+.page { display: none; min-height: 100vh; }
+.page.active { display: block; }
+
+/* ═══════════════════════════════════════════
+   GLOW BLOBS (fixed, per-page tinting)
+═══════════════════════════════════════════ */
+.blob {
+  position: fixed; border-radius: 50%;
+  filter: blur(100px); pointer-events: none; z-index: 0;
+  transition: background 0.8s ease;
+}
+#blob1 { width:420px;height:320px;background:rgba(79,142,247,0.10);bottom:-60px;left:-80px; }
+#blob2 { width:380px;height:300px;background:rgba(155,110,250,0.09);bottom:-40px;right:-70px; }
+#blob3 { width:220px;height:220px;background:rgba(79,142,247,0.07);top:100px;right:12%; }
+
+/* ═══════════════════════════════════════════
+   NAVBAR
+═══════════════════════════════════════════ */
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 56px;
+  background: rgba(10,10,10,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-b);
+}
+.nav-logo { display:flex; align-items:center; gap:10px; cursor:pointer; }
+.logo-mark {
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,var(--blue),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 18px rgba(79,142,247,0.35);
+  flex-shrink:0;
+}
+.logo-mark svg { width:18px;height:18px; }
+.logo-txt {
+  font-family:'Syne',sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px;
+  background:linear-gradient(90deg,#F0EFFF,#9B9EFF);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.nav-links { display:flex;gap:4px; }
+.nav-links button {
+  font-size:14px;font-weight:500;color:var(--ts);
+  background:none;border:none;padding:8px 16px;border-radius:var(--r-pill);
+  transition:all .2s;
+}
+.nav-links button:hover, .nav-links button.active {
+  color:var(--tp);background:var(--glass);
+}
+.nav-links button.active { color:var(--blue);background:rgba(79,142,247,0.10); }
+.nav-cta { display:flex;gap:8px;align-items:center; }
+.btn-ghost {
+  font-size:13px;font-weight:500;color:var(--ts);
+  background:transparent;border:1px solid var(--glass-b);
+  border-radius:var(--r-pill);padding:8px 18px;transition:all .2s;
+}
+.btn-ghost:hover { color:var(--tp);border-color:var(--glass-bs); }
+.btn-primary {
+  font-size:13px;font-weight:600;color:#fff;
+  background:linear-gradient(135deg,var(--blue),var(--purple));
+  border:none;border-radius:var(--r-pill);padding:9px 22px;
+  box-shadow:0 0 20px rgba(79,142,247,0.28);transition:all .25s;
+}
+.btn-primary:hover { box-shadow:0 0 32px rgba(79,142,247,0.5);transform:translateY(-1px); }
+.avatar {
+  width:34px;height:34px;border-radius:50%;
+  background:linear-gradient(135deg,var(--blue),var(--purple));
+  border:1px solid rgba(255,255,255,0.15);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:600;color:#fff;
+}
+
+/* ═══════════════════════════════════════════
+   WRAPPER
+═══════════════════════════════════════════ */
+.wrap { max-width:1160px;margin:0 auto;padding:0 40px; position:relative;z-index:1; }
+
+/* ═══════════════════════════════════════════
+   PANEL / CARD
+═══════════════════════════════════════════ */
+.panel {
+  background:var(--glass);border:1px solid var(--glass-b);
+  border-radius:var(--r-lg);padding:28px;
+  position:relative;overflow:hidden;
+}
+.panel::after {
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
+}
+.panel-title {
+  font-family:'Syne',sans-serif;font-size:15px;font-weight:600;
+  margin-bottom:20px;display:flex;align-items:center;gap:8px;
+}
+.pdot {
+  width:7px;height:7px;border-radius:50%;
+  background:linear-gradient(135deg,var(--blue),var(--purple));
+  box-shadow:0 0 8px rgba(79,142,247,0.6);flex-shrink:0;
+}
+
+/* ═══════════════════════════════════════════
+   BADGE
+═══════════════════════════════════════════ */
+.badge-live {
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(61,235,177,0.1);border:1px solid rgba(61,235,177,0.22);
+  border-radius:var(--r-pill);padding:5px 14px;
+  font-size:12px;font-weight:500;color:var(--success);
+}
+.live-dot { width:6px;height:6px;background:var(--success);border-radius:50%;animation:blink 2s infinite; }
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:.25} }
+
+/* ═══════════════════════════════════════════
+   ██████  HOME PAGE
+═══════════════════════════════════════════ */
+.hero {
+  padding: 100px 0 80px;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+.hero-eyebrow {
+  display:inline-flex;align-items:center;gap:8px;
+  border:1px solid var(--glass-bs);border-radius:var(--r-pill);
+  padding:6px 16px;font-size:13px;color:var(--ts);margin-bottom:28px;
+}
+.hero-eyebrow span { color:var(--blue);font-weight:500; }
+.hero h1 {
+  font-family:'Syne',sans-serif;font-size:clamp(40px,6vw,72px);
+  font-weight:800;letter-spacing:-1.5px;line-height:1.05;
+  margin-bottom:24px;
+}
+.hero h1 em {
+  font-style:normal;
+  background:linear-gradient(135deg,var(--blue),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero p {
+  font-size:18px;color:var(--ts);line-height:1.7;
+  max-width:580px;margin:0 auto 40px;
+}
+.hero-btns { display:flex;gap:12px;justify-content:center;flex-wrap:wrap; }
+.btn-lg {
+  font-size:15px;font-weight:600;padding:14px 32px;
+  border-radius:var(--r-pill);border:none;transition:all .25s;
+}
+.btn-lg.primary {
+  background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;
+  box-shadow:0 0 28px rgba(79,142,247,0.35);
+}
+.btn-lg.primary:hover { box-shadow:0 0 44px rgba(79,142,247,0.55);transform:translateY(-2px); }
+.btn-lg.ghost {
+  background:var(--glass);color:var(--tp);border:1px solid var(--glass-bs);
+}
+.btn-lg.ghost:hover { background:rgba(255,255,255,0.07);transform:translateY(-2px); }
+
+/* Hero visual */
+.hero-visual {
+  max-width:800px;margin:60px auto 0;position:relative;
+}
+.hero-card {
+  background:rgba(255,255,255,0.035);
+  border:1px solid var(--glass-bs);border-radius:var(--r-xl);
+  padding:32px;overflow:hidden;position:relative;
+}
+.hero-card::before {
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 0%,rgba(79,142,247,0.08) 0%,transparent 60%);
+}
+.scan-preview {
+  width:100%;height:200px;border-radius:var(--r-md);
+  background:linear-gradient(135deg,rgba(79,142,247,0.06),rgba(155,110,250,0.06));
+  border:1px solid var(--glass-b);display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;margin-bottom:20px;
+}
+.scan-anim {
+  position:absolute;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(79,142,247,0.8),transparent);
+  animation:scanv 2.5s linear infinite;
+}
+@keyframes scanv { 0%{top:0;opacity:0}10%{opacity:1}90%{opacity:1}100%{top:100%;opacity:0} }
+.face-detect {
+  width:100px;height:110px;border:2px solid var(--danger);border-radius:6px;
+  position:relative;box-shadow:0 0 24px rgba(255,90,110,0.3);
+}
+.face-detect::before, .face-detect::after {
+  content:'';position:absolute;width:16px;height:16px;border-color:var(--danger);border-style:solid;
+}
+.face-detect::before { top:-2px;left:-2px;border-width:2px 0 0 2px; }
+.face-detect::after  { bottom:-2px;right:-2px;border-width:0 2px 2px 0; }
+.detect-lbl {
+  position:absolute;top:-28px;left:0;
+  font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--danger);
+  background:rgba(255,90,110,0.15);border:1px solid rgba(255,90,110,0.3);
+  padding:3px 8px;border-radius:4px;white-space:nowrap;
+}
+.hero-stats {
+  display:grid;grid-template-columns:repeat(3,1fr);gap:16px;
+}
+.hstat {
+  text-align:center;padding:16px;
+  background:rgba(255,255,255,0.02);border-radius:var(--r-md);
+  border:1px solid var(--glass-b);
+}
+.hstat-v {
+  font-family:'Syne',sans-serif;font-size:24px;font-weight:700;
+  background:linear-gradient(135deg,var(--blue),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hstat-l { font-size:12px;color:var(--tm);margin-top:4px; }
+
+/* Trust bar */
+.trust-bar {
+  padding:48px 0;border-top:1px solid var(--glass-b);border-bottom:1px solid var(--glass-b);
+  text-align:center;margin-bottom:80px;
+}
+.trust-bar p { font-size:13px;color:var(--tm);letter-spacing:.8px;text-transform:uppercase;margin-bottom:24px; }
+.trust-logos { display:flex;justify-content:center;gap:40px;flex-wrap:wrap; }
+.trust-logo {
+  font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:rgba(255,255,255,0.18);
+  letter-spacing:1px;
+}
+
+/* Why section */
+.why-section { padding:80px 0; }
+.section-header { text-align:center;margin-bottom:56px; }
+.section-header h2 {
+  font-family:'Syne',sans-serif;font-size:clamp(28px,4vw,42px);
+  font-weight:700;letter-spacing:-.5px;margin-bottom:12px;
+}
+.section-header p { font-size:16px;color:var(--ts);max-width:500px;margin:0 auto; }
+
+.why-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:20px; }
+.why-card {
+  background:var(--glass);border:1px solid var(--glass-b);
+  border-radius:var(--r-lg);padding:28px;transition:all .25s;
+  position:relative;overflow:hidden;
+}
+.why-card:hover { border-color:var(--glass-bs);transform:translateY(-4px); }
+.why-card::after {
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
+}
+.why-icon {
+  width:48px;height:48px;border-radius:14px;
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:18px;font-size:22px;
+}
+.why-icon.blue { background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.2); }
+.why-icon.purple { background:rgba(155,110,250,0.12);border:1px solid rgba(155,110,250,0.2); }
+.why-icon.green { background:rgba(61,235,177,0.1);border:1px solid rgba(61,235,177,0.2); }
+.why-card h3 { font-family:'Syne',sans-serif;font-size:16px;font-weight:600;margin-bottom:10px; }
+.why-card p { font-size:14px;color:var(--ts);line-height:1.7; }
+
+/* CTA strip */
+.cta-strip {
+  margin:0 0 80px;padding:56px;
+  background:linear-gradient(135deg,rgba(79,142,247,0.08),rgba(155,110,250,0.08));
+  border:1px solid rgba(79,142,247,0.2);border-radius:var(--r-xl);
+  text-align:center;position:relative;overflow:hidden;
+}
+.cta-strip::before {
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 0%,rgba(79,142,247,0.12),transparent 60%);
+}
+.cta-strip h2 {
+  font-family:'Syne',sans-serif;font-size:clamp(24px,3.5vw,36px);
+  font-weight:700;letter-spacing:-.4px;margin-bottom:12px;position:relative;
+}
+.cta-strip p { font-size:15px;color:var(--ts);margin-bottom:28px;position:relative; }
+
+/* ═══════════════════════════════════════════
+   ██████  FEATURES PAGE
+═══════════════════════════════════════════ */
+.feat-hero { padding:72px 0 56px;text-align:center; }
+.feat-hero h1 {
+  font-family:'Syne',sans-serif;font-size:clamp(32px,5vw,56px);
+  font-weight:800;letter-spacing:-1px;margin-bottom:16px;
+}
+.feat-hero p { font-size:17px;color:var(--ts);max-width:520px;margin:0 auto; }
+
+.feat-big-grid { display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-bottom:20px; }
+.feat-card {
+  background:var(--glass);border:1px solid var(--glass-b);
+  border-radius:var(--r-lg);padding:32px;position:relative;overflow:hidden;
+  transition:all .25s;
+}
+.feat-card:hover { border-color:var(--glass-bs);transform:translateY(-3px); }
+.feat-card::after {
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
+}
+.feat-card.span2 { grid-column:span 2; }
+.feat-num {
+  font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
+  color:var(--blue);letter-spacing:1.5px;margin-bottom:12px;
+}
+.feat-card h3 {
+  font-family:'Syne',sans-serif;font-size:20px;font-weight:700;
+  letter-spacing:-.2px;margin-bottom:10px;
+}
+.feat-card p { font-size:14px;color:var(--ts);line-height:1.7;margin-bottom:20px; }
+.feat-pill {
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:12px;font-weight:500;padding:4px 12px;
+  border-radius:var(--r-pill);border:1px solid var(--glass-b);color:var(--ts);
+}
+.feat-visual {
+  height:90px;border-radius:var(--r-md);margin-bottom:20px;
+  display:flex;align-items:center;justify-content:center;position:relative;
+  overflow:hidden;
+}
+.feat-visual.blue { background:linear-gradient(135deg,rgba(79,142,247,0.1),rgba(155,110,250,0.06)); }
+.feat-visual.purple { background:linear-gradient(135deg,rgba(155,110,250,0.1),rgba(79,142,247,0.06)); }
+.feat-visual.green { background:linear-gradient(135deg,rgba(61,235,177,0.08),rgba(79,142,247,0.06)); }
+.mini-meter { width:200px; }
+.mini-meter-track {
+  height:6px;background:rgba(255,255,255,0.06);border-radius:var(--r-pill);overflow:hidden;
+}
+.mini-meter-fill {
+  height:100%;background:linear-gradient(90deg,var(--blue),var(--purple));
+  border-radius:var(--r-pill);box-shadow:0 0 10px rgba(79,142,247,0.5);
+}
+.mini-bars { display:flex;align-items:flex-end;gap:5px;height:50px; }
+.mb { border-radius:3px 3px 0 0; }
+
+/* ═══════════════════════════════════════════
+   ██████  ABOUT PAGE
+═══════════════════════════════════════════ */
+.about-hero { padding:72px 0 56px; }
+.about-hero h1 {
+  font-family:'Syne',sans-serif;font-size:clamp(32px,5vw,56px);
+  font-weight:800;letter-spacing:-1px;margin-bottom:16px;
+  max-width:700px;
+}
+.about-hero p { font-size:17px;color:var(--ts);max-width:580px;line-height:1.7; }
+
+.about-grid { display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:56px; }
+.about-stat-card {
+  background:var(--glass);border:1px solid var(--glass-b);
+  border-radius:var(--r-lg);padding:32px;text-align:center;
+}
+.about-stat-v {
+  font-family:'Syne',sans-serif;font-size:40px;font-weight:800;
+  background:linear-gradient(135deg,var(--blue),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:6px;
+}
+.about-stat-l { font-size:14px;color:var(--ts); }
+
+.mission-block {
+  background:linear-gradient(135deg,rgba(79,142,247,0.07),rgba(155,110,250,0.07));
+  border:1px solid rgba(79,142,247,0.15);border-radius:var(--r-xl);
+  padding:48px;margin-bottom:56px;position:relative;overflow:hidden;
+}
+.mission-block::before {
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 0% 50%,rgba(79,142,247,0.08),transparent 50%);
+}
+.mission-block h2 {
+  font-family:'Syne',sans-serif;font-size:28px;font-weight:700;
+  letter-spacing:-.3px;margin-bottom:16px;position:relative;
+}
+.mission-block p { font-size:15px;color:var(--ts);line-height:1.8;position:relative; }
+
+.team-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:56px; }
+.team-card {
+  background:var(--glass);border:1px solid var(--glass-b);
+  border-radius:var(--r-lg);padding:28px;text-align:center;transition:all .25s;
+}
+.team-card:hover { border-color:var(--glass-bs);transform:translateY(-4px); }
+.team-avatar {
+  width:72px;height:72px;border-radius:50%;
+  background:linear-gradient(135deg,var(--blue),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-size:22px;font-weight:700;color:#fff;
+  margin:0 auto 16px;border:2px solid rgba(255,255,255,0.1);
+}
+.team-card h3 { font-family:'Syne',sans-serif;font-size:16px;font-weight:600;margin-bottom:4px; }
+.team-card .role { font-size:13px;color:var(--blue);margin-bottom:10px; }
+.team-card p { font-size:13px;color:var(--ts);line-height:1.6; }
+
+.timeline { position:relative;padding-left:28px;margin-bottom:56px; }
+.timeline::before {
+  content:'';position:absolute;left:6px;top:0;bottom:0;width:1px;
+  background:linear-gradient(180deg,var(--blue),var(--purple),transparent);
+}
+.tl-item { position:relative;margin-bottom:32px; }
+.tl-item::before {
+  content:'';position:absolute;left:-28px;top:6px;
+  width:12px;height:12px;border-radius:50%;
+  background:linear-gradient(135deg,var(--blue),var(--purple));
+  box-shadow:0 0 10px rgba(79,142,247,0.5);
+}
+.tl-year { font-size:12px;font-weight:600;color:var(--blue);letter-spacing:.8px;margin-bottom:4px; }
+.tl-item h3 { font-family:'Syne',sans-serif;font-size:16px;font-weight:600;margin-bottom:6px; }
+.tl-item p { font-size:14px;color:var(--ts);line-height:1.6; }
+
+/* ═══════════════════════════════════════════
+   ██████  CONTACT PAGE
+═══════════════════════════════════════════ */
+.contact-hero { padding:72px 0 48px; }
+.contact-hero h1 {
+  font-family:'Syne',sans-serif;font-size:clamp(32px,5vw,52px);
+  font-weight:800;letter-spacing:-1px;margin-bottom:14px;
+}
+.contact-hero p { font-size:17px;color:var(--ts);max-width:500px;line-height:1.7; }
+
+.contact-grid { display:grid;grid-template-columns:1fr 420px;gap:24px;padding-bottom:80px; }
+
+.contact-form-panel { background:var(--glass);border:1px solid var(--glass-b);border-radius:var(--r-xl);padding:36px; }
+.form-row { margin-bottom:20px; }
+.form-row label { display:block;font-size:13px;font-weight:500;color:var(--ts);margin-bottom:8px; }
+.form-input {
+  width:100%;background:rgba(255,255,255,0.04);
+  border:1px solid var(--glass-b);border-radius:var(--r-md);
+  padding:12px 16px;color:var(--tp);font-size:14px;
+  transition:all .2s;outline:none;
+}
+.form-input:focus { border-color:rgba(79,142,247,0.4);box-shadow:0 0 0 3px rgba(79,142,247,0.08); }
+.form-input::placeholder { color:var(--tm); }
+textarea.form-input { resize:vertical;min-height:120px; }
+.form-grid2 { display:grid;grid-template-columns:1fr 1fr;gap:16px; }
+.form-success {
+  display:none;text-align:center;padding:32px;
+  background:rgba(61,235,177,0.06);border:1px solid rgba(61,235,177,0.2);
+  border-radius:var(--r-md);margin-top:16px;
+}
+.form-success.show { display:block; }
+.form-success h3 { font-family:'Syne',sans-serif;font-size:18px;font-weight:600;margin-bottom:8px;color:var(--success); }
+.form-success p { font-size:14px;color:var(--ts); }
+
+.contact-info-side { display:flex;flex-direction:column;gap:16px; }
+.contact-info-card {
+  background:var(--glass);border:1px solid var(--glass-b);
+  border-radius:var(--r-lg);padding:24px;
+}
+.ci-icon { font-size:24px;margin-bottom:12px; }
+.ci-title { font-family:'Syne',sans-serif;font-size:15px;font-weight:600;margin-bottom:6px; }
+.ci-text { font-size:14px;color:var(--ts);line-height:1.6; }
+.ci-link { color:var(--blue);font-size:14px;margin-top:8px;display:block; }
+
+.faq-section { padding:0 0 80px; }
+.faq-title {
+  font-family:'Syne',sans-serif;font-size:24px;font-weight:700;
+  letter-spacing:-.3px;margin-bottom:24px;
+}
+.faq-item {
+  border-bottom:1px solid var(--glass-b);padding:18px 0;cursor:pointer;
+}
+.faq-q {
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:15px;font-weight:500;
+}
+.faq-chevron { transition:transform .25s;color:var(--ts); }
+.faq-a {
+  font-size:14px;color:var(--ts);line-height:1.7;
+  max-height:0;overflow:hidden;transition:max-height .35s ease,padding .25s;
+}
+.faq-item.open .faq-chevron { transform:rotate(180deg); }
+.faq-item.open .faq-a { max-height:200px;padding-top:12px; }
+
+/* ═══════════════════════════════════════════
+   ██████  DASHBOARD PAGE
+═══════════════════════════════════════════ */
+.dash-wrap { padding:36px 40px 60px;max-width:1160px;margin:0 auto;position:relative;z-index:1; }
+.dash-header { display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:32px; }
+.dash-header h1 {
+  font-family:'Syne',sans-serif;font-size:26px;font-weight:700;
+  letter-spacing:-.4px;margin-bottom:6px;
+}
+.dash-header p { font-size:14px;color:var(--ts); }
+
+/* Stats row */
+.stats-row { display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px; }
+.stat-card {
+  background:var(--glass);border:1px solid var(--glass-b);
+  border-radius:var(--r-md);padding:20px 22px;position:relative;overflow:hidden;
+  transition:border-color .2s;
+}
+.stat-card:hover { border-color:var(--glass-bs); }
+.stat-card::after {
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
+}
+.stat-lbl { font-size:11px;font-weight:500;color:var(--tm);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px; }
+.stat-val { font-family:'Syne',sans-serif;font-size:26px;font-weight:700;margin-bottom:4px;line-height:1; }
+.stat-sub { font-size:12px;color:var(--tm); }
+.stat-card.s-blue .stat-val { color:var(--blue); }
+.stat-card.s-purple .stat-val { color:var(--purple); }
+.stat-card.s-danger .stat-val { color:var(--danger); }
+.stat-card.s-success .stat-val { color:var(--success); }
+
+/* Main grid */
+.dash-main { display:grid;grid-template-columns:1fr 360px;gap:20px;margin-bottom:20px; }
+.dash-left { display:flex;flex-direction:column;gap:20px; }
+
+/* Tabs */
+.tabs { display:flex;background:rgba(255,255,255,0.03);border:1px solid var(--glass-b);border-radius:var(--r-pill);padding:4px;width:fit-content;gap:2px;margin-bottom:20px; }
+.tab { font-size:13px;font-weight:500;padding:7px 16px;border-radius:var(--r-pill);color:var(--tm);background:none;border:none;transition:all .2s; }
+.tab:hover:not(.active) { color:var(--ts); }
+.tab.active { background:rgba(79,142,247,0.15);color:var(--blue);border:1px solid rgba(79,142,247,0.25); }
+
+/* Upload zone */
+.upload-zone {
+  border:1.5px dashed var(--glass-bs);border-radius:var(--r-md);
+  padding:48px 24px;text-align:center;cursor:pointer;
+  transition:all .25s;background:rgba(79,142,247,0.02);
+  position:relative;overflow:hidden;
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color:rgba(79,142,247,0.45);
+  background:rgba(79,142,247,0.06);
+  box-shadow:0 0 32px rgba(79,142,247,0.08);
+}
+.upload-icon-wrap {
+  width:56px;height:56px;border-radius:16px;
+  background:linear-gradient(135deg,rgba(79,142,247,0.15),rgba(155,110,250,0.15));
+  border:1px solid rgba(79,142,247,0.2);
+  display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
+}
+.upload-icon-wrap svg { width:24px;height:24px; }
+.upload-zone h3 { font-family:'Syne',sans-serif;font-size:15px;font-weight:600;margin-bottom:6px; }
+.upload-zone p { font-size:13px;color:var(--tm);line-height:1.6;margin-bottom:18px; }
+.upload-zone p span { color:var(--blue); }
+.type-tags { display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:22px; }
+.type-tag {
+  font-size:11px;font-weight:500;padding:4px 10px;
+  border-radius:var(--r-pill);border:1px solid var(--glass-b);color:var(--tm);
+}
+#file-input { display:none; }
+
+/* Model grid */
+.model-grid { display:grid;grid-template-columns:repeat(2,1fr);gap:10px; }
+.model-card {
+  border:1px solid var(--glass-b);border-radius:var(--r-sm);
+  padding:14px 16px;cursor:pointer;transition:all .2s;
+  background:rgba(255,255,255,0.02);
+}
+.model-card:hover { border-color:var(--glass-bs); }
+.model-card.selected { border-color:rgba(79,142,247,0.4);background:rgba(79,142,247,0.06); }
+.model-card.selected .mc-name { color:var(--blue); }
+.mc-name { font-size:13px;font-weight:600;margin-bottom:2px; }
+.mc-desc { font-size:11px;color:var(--tm); }
+.mc-acc { font-size:11px;font-weight:600;color:var(--blue);margin-top:6px; }
+
+/* Result panel */
+.result-placeholder {
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:300px;text-align:center;padding:24px;
+}
+.result-placeholder svg { width:48px;height:48px;opacity:.25;margin-bottom:16px; }
+.result-placeholder p { font-size:13px;color:var(--tm);line-height:1.6; }
+.result-content { display:none; }
+
+/* Analyzing state */
+.analyzing-state {
+  display:none;padding:24px;text-align:center;
+}
+.analyzing-ring {
+  width:80px;height:80px;border-radius:50%;
+  border:3px solid rgba(79,142,247,0.15);
+  border-top:3px solid var(--blue);
+  animation:spin 1s linear infinite;
+  margin:0 auto 16px;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+.analyzing-state p { font-size:14px;color:var(--ts); }
+.progress-track { height:4px;background:rgba(255,255,255,0.06);border-radius:var(--r-pill);overflow:hidden;margin-top:12px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--blue),var(--purple));border-radius:var(--r-pill);width:0%;transition:width .3s ease; }
+
+/* Result display */
+.preview-thumb {
+  width:100%;height:160px;border-radius:var(--r-md);
+  background:linear-gradient(135deg,rgba(79,142,247,0.08),rgba(155,110,250,0.08));
+  border:1px solid var(--glass-b);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;margin-bottom:20px;
+}
+.preview-thumb::before {
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,transparent 50%,rgba(255,90,110,0.06) 100%);
+}
+.preview-scan-line {
+  position:absolute;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(79,142,247,0.7),transparent);
+  animation:scanv 2.5s linear infinite;
+}
+.preview-face-box {
+  width:90px;height:100px;border:1.5px solid var(--danger);border-radius:4px;
+  box-shadow:0 0 18px rgba(255,90,110,0.3);position:relative;
+}
+.preview-face-box::before,.preview-face-box::after {
+  content:'';position:absolute;width:14px;height:14px;border-color:var(--danger);border-style:solid;
+}
+.preview-face-box::before { top:-2px;left:-2px;border-width:2px 0 0 2px; }
+.preview-face-box::after  { bottom:-2px;right:-2px;border-width:0 2px 2px 0; }
+.preview-face-label {
+  position:absolute;top:-26px;left:0;font-size:10px;font-weight:700;
+  color:var(--danger);letter-spacing:.5px;background:rgba(255,90,110,0.15);
+  border:1px solid rgba(255,90,110,0.3);padding:2px 7px;border-radius:4px;white-space:nowrap;
+}
+.preview-face-box.real-box {
+  border-color:var(--success);box-shadow:0 0 18px rgba(61,235,177,0.25);
+}
+.preview-face-box.real-box::before,.preview-face-box.real-box::after { border-color:var(--success); }
+.preview-face-label.real-lbl { color:var(--success);background:rgba(61,235,177,0.1);border-color:rgba(61,235,177,0.3); }
+
+.result-badge {
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 14px;border-radius:var(--r-pill);font-size:13px;font-weight:600;
+}
+.result-badge.fake { background:rgba(255,90,110,0.12);border:1px solid rgba(255,90,110,0.3);color:var(--danger); }
+.result-badge.real { background:rgba(61,235,177,0.1);border:1px solid rgba(61,235,177,0.25);color:var(--success); }
+.rbdot { width:7px;height:7px;border-radius:50%;background:currentColor; }
+
+.conf-block { margin-bottom:22px; }
+.conf-header { display:flex;justify-content:space-between;align-items:center;margin-bottom:10px; }
+.conf-lbl { font-size:12px;color:var(--tm);text-transform:uppercase;letter-spacing:.7px; }
+.conf-val { font-family:'Syne',sans-serif;font-size:22px;font-weight:700; }
+.conf-val.fake { color:var(--danger); }
+.conf-val.real { color:var(--success); }
+.meter-track { height:8px;border-radius:var(--r-pill);background:rgba(255,255,255,0.06);overflow:hidden; }
+.meter-fill { height:100%;border-radius:var(--r-pill);transition:width 1s cubic-bezier(.16,1,.3,1); }
+.meter-fill.fake { background:linear-gradient(90deg,var(--purple),var(--danger));box-shadow:0 0 12px rgba(255,90,110,0.4); }
+.meter-fill.real { background:linear-gradient(90deg,var(--blue),var(--success));box-shadow:0 0 12px rgba(61,235,177,0.3); }
+
+.signals-list { display:flex;flex-direction:column;gap:12px;margin-bottom:22px; }
+.sig-row { display:flex;align-items:center;gap:12px; }
+.sig-name { font-size:13px;color:var(--ts);flex:1; }
+.sig-bar-wrap { flex:2;height:5px;background:rgba(255,255,255,0.06);border-radius:var(--r-pill);overflow:hidden; }
+.sig-bar { height:100%;border-radius:var(--r-pill); }
+.sig-bar.h { background:linear-gradient(90deg,var(--purple),var(--danger));box-shadow:0 0 8px rgba(255,90,110,0.4); }
+.sig-bar.m { background:linear-gradient(90deg,var(--blue),var(--purple));box-shadow:0 0 8px rgba(155,110,250,0.3); }
+.sig-bar.l { background:rgba(61,235,177,0.6); }
+.sig-pct { font-size:12px;font-weight:600;color:var(--tm);min-width:34px;text-align:right; }
+
+/* Detections table */
+.det-table { width:100%;border-collapse:collapse; }
+.det-table th {
+  text-align:left;font-size:11px;font-weight:500;color:var(--tm);
+  text-transform:uppercase;letter-spacing:.7px;padding:0 0 12px;
+  border-bottom:1px solid var(--glass-b);
+}
+.det-table td { padding:13px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle; }
+.det-table tr:last-child td { border-bottom:none; }
+.file-cell { display:flex;align-items:center;gap:10px; }
+.ficon {
+  width:32px;height:32px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;
+}
+.ficon.vid { background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.2); }
+.ficon.img { background:rgba(155,110,250,0.12);border:1px solid rgba(155,110,250,0.2); }
+.ficon.aud { background:rgba(247,164,64,0.12);border:1px solid rgba(247,164,64,0.2); }
+.fname { font-size:13px;color:var(--tp);font-weight:500; }
+.fsize { font-size:11px;color:var(--tm); }
+.pill {
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:11px;font-weight:600;padding:3px 10px;border-radius:var(--r-pill);
+}
+.pill.fake { background:rgba(255,90,110,0.12);color:var(--danger);border:1px solid rgba(255,90,110,0.25); }
+.pill.real { background:rgba(61,235,177,0.08);color:var(--success);border:1px solid rgba(61,235,177,0.2); }
+.pill.scan { background:rgba(247,164,64,0.1);color:var(--warn);border:1px solid rgba(247,164,64,0.2); }
+.pdot2 { width:5px;height:5px;border-radius:50%;background:currentColor; }
+
+/* Bottom dash */
+.dash-bottom { display:grid;grid-template-columns:1fr 1fr;gap:20px; }
+
+/* Sparkline */
+.spark-wrap { display:flex;align-items:flex-end;gap:4px;height:48px; }
+.sbar { flex:1;border-radius:3px 3px 0 0;min-height:4px; }
+.sbar.f { background:linear-gradient(180deg,var(--danger),rgba(255,90,110,0.25)); }
+.sbar.r { background:linear-gradient(180deg,var(--success),rgba(61,235,177,0.15)); }
+
+/* Donut */
+.donut-wrap { position:relative;width:100px;height:100px;margin:0 auto 16px; }
+.donut-wrap svg { transform:rotate(-90deg); }
+.donut-lbl {
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+.donut-pct { font-family:'Syne',sans-serif;font-size:20px;font-weight:700; }
+.donut-sub { font-size:10px;color:var(--tm); }
+
+/* ═══════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════ */
+footer {
+  border-top:1px solid var(--glass-b);
+  padding:40px 56px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:relative;z-index:1;
+}
+.footer-logo { display:flex;align-items:center;gap:8px; }
+.footer-logo span { font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--ts); }
+footer p { font-size:13px;color:var(--tm); }
+.footer-links { display:flex;gap:20px; }
+.footer-links a { font-size:13px;color:var(--tm);transition:color .2s; }
+.footer-links a:hover { color:var(--ts); }
+
+/* ═══════════════════════════════════════════
+   ANIMATIONS
+═══════════════════════════════════════════ */
+.fade-in { opacity:0;transform:translateY(20px);animation:fadeUp .6s ease forwards; }
+@keyframes fadeUp { to{opacity:1;transform:translateY(0)} }
+.fade-in:nth-child(1){animation-delay:.05s}
+.fade-in:nth-child(2){animation-delay:.12s}
+.fade-in:nth-child(3){animation-delay:.19s}
+.fade-in:nth-child(4){animation-delay:.26s}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE TWEAKS
+═══════════════════════════════════════════ */
+@media(max-width:900px){
+  .nav{padding:14px 20px;}
+  .nav-links{display:none;}
+  .wrap,.dash-wrap{padding:0 20px;}
+  .why-grid,.about-grid,.team-grid,.feat-big-grid,.dash-bottom,.contact-grid,.dash-main{grid-template-columns:1fr;}
+  .stats-row{grid-template-columns:repeat(2,1fr);}
+  .feat-card.span2{grid-column:span 1;}
+  footer{flex-direction:column;gap:16px;text-align:center;padding:24px 20px;}
+  .footer-links{justify-content:center;}
+  .hero h1{font-size:36px;}
+}
+</style>
+</head>
+<body>
+
+<!-- AMBIENT GLOW BLOBS -->
+<div class="blob" id="blob1"></div>
+<div class="blob" id="blob2"></div>
+<div class="blob" id="blob3"></div>
+
+<!-- ═══════════ NAVBAR ═══════════ -->
+<nav class="nav">
+  <div class="nav-logo" onclick="navigate('home')">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M15,6 C13,4 9,4 7,7 C5,10 6,14 8,16 C9,17 9,19 8,21 L13,21 C14,19 15,16 16,14 C17,12 17,9 15,6 Z" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="4" y1="12" x2="20" y2="12" stroke-width="0.5" opacity="0.4"/>
+        <line x1="12" y1="4" x2="12" y2="20" stroke-width="0.5" opacity="0.4"/>
+        <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/>
+      </svg>
+    </div>
+    <span class="logo-txt">Castellan</span>
+  </div>
+  <ul class="nav-links">
+    <li><button onclick="navigate('home')" id="nav-home" class="active">Home</button></li>
+    <li><button onclick="navigate('features')" id="nav-features">Features</button></li>
+    <li><button onclick="navigate('about')" id="nav-about">About</button></li>
+    <li><button onclick="navigate('contact')" id="nav-contact">Contact</button></li>
+  </ul>
+  <div class="nav-cta">
+    <button class="btn-ghost" onclick="navigate('dashboard')">Dashboard</button>
+    <button class="btn-primary" onclick="navigate('dashboard')">Try for Free</button>
+    <div class="avatar">AS</div>
+  </div>
+</nav>
+
+<!-- ════════════════════════════════════════
+     PAGE: HOME
+════════════════════════════════════════ -->
+<div class="page active" id="page-home">
+  <!-- Hero -->
+  <section class="hero wrap">
+    <div class="hero-eyebrow fade-in">🛡️ &nbsp;Powered by Neural Networks · <span>v3.8 — Latest</span></div>
+    <h1 class="fade-in">Detect <em>Deepfakes</em><br>Before They Spread</h1>
+    <p class="fade-in">Castellan uses state-of-the-art multimodal AI to detect manipulated images, videos and audio with 97.3% accuracy — in under 2 seconds.</p>
+    <div class="hero-btns fade-in">
+      <button class="btn-lg primary" onclick="navigate('dashboard')">Start Analyzing Free</button>
+      <button class="btn-lg ghost" onclick="navigate('features')">Explore Features</button>
+    </div>
+
+    <div class="hero-visual fade-in">
+      <div class="hero-card">
+        <div class="scan-preview">
+          <div class="scan-anim"></div>
+          <div class="face-detect">
+            <span class="detect-lbl">DEEPFAKE · 94.7%</span>
+          </div>
+        </div>
+        <div class="hero-stats">
+          <div class="hstat"><div class="hstat-v">97.3%</div><div class="hstat-l">Detection Accuracy</div></div>
+          <div class="hstat"><div class="hstat-v">&lt;2s</div><div class="hstat-l">Avg. Scan Time</div></div>
+          <div class="hstat"><div class="hstat-v">12M+</div><div class="hstat-l">Files Analyzed</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Trust Bar -->
+  <div class="wrap">
+    <div class="trust-bar">
+      <p>Trusted by researchers, journalists &amp; security teams worldwide</p>
+      <div class="trust-logos">
+        <span class="trust-logo">MEDIAGUARD</span>
+        <span class="trust-logo">FACTCHECK.AI</span>
+        <span class="trust-logo">VERITAS LABS</span>
+        <span class="trust-logo">TRUTHNET</span>
+        <span class="trust-logo">OPENSEC</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Why -->
+  <section class="why-section wrap">
+    <div class="section-header">
+      <h2>Why Castellan?</h2>
+      <p>The world's most accurate, fastest, and easiest deepfake detection platform.</p>
+    </div>
+    <div class="why-grid">
+      <div class="why-card fade-in">
+        <div class="why-icon blue">🧠</div>
+        <h3>Multimodal AI Engine</h3>
+        <p>Analyzes facial geometry, texture artifacts, lighting consistency, audio-visual sync, and metadata — all in a single pass.</p>
+      </div>
+      <div class="why-card fade-in">
+        <div class="why-icon purple">⚡</div>
+        <h3>Real-Time Results</h3>
+        <p>Get a full confidence breakdown in under 2 seconds. Our optimized inference pipeline handles images, video, and audio without delay.</p>
+      </div>
+      <div class="why-card fade-in">
+        <div class="why-icon green">🔒</div>
+        <h3>Privacy First</h3>
+        <p>Files are scanned in-memory and never stored. Your uploads are encrypted in transit and deleted immediately after analysis.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <div class="wrap">
+    <div class="cta-strip">
+      <h2>Ready to expose the truth?</h2>
+      <p>Join 50,000+ users protecting themselves from synthetic media manipulation.</p>
+      <button class="btn-lg primary" onclick="navigate('dashboard')">Open the Dashboard →</button>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-logo">
+      <div class="logo-mark" style="width:28px;height:28px;border-radius:8px;">
+        <svg viewBox="0 0 20 20" fill="none" style="width:14px;height:14px;">
+          <circle cx="10" cy="10" r="7" stroke="white" stroke-width="1.5"/>
+          <circle cx="10" cy="10" r="3" fill="white"/>
+        </svg>
+      </div>
+      <span>Castellan</span>
+    </div>
+    <p>© 2025 Castellan AI. All rights reserved.</p>
+    <div class="footer-links">
+      <a href="#" onclick="navigate('features');return false;">Features</a>
+      <a href="#" onclick="navigate('about');return false;">About</a>
+      <a href="#" onclick="navigate('contact');return false;">Contact</a>
+      <a href="#">Privacy</a>
+    </div>
+  </footer>
+</div>
+
+<!-- ════════════════════════════════════════
+     PAGE: FEATURES
+════════════════════════════════════════ -->
+<div class="page" id="page-features">
+  <div class="wrap">
+    <div class="feat-hero">
+      <div class="badge-live" style="margin-bottom:20px;"><span class="live-dot"></span> All systems operational</div>
+      <h1 class="fade-in">Capabilities that<br><em style="font-style:normal;background:linear-gradient(135deg,var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">outperform humans</em></h1>
+      <p class="fade-in" style="margin-top:12px;">Every detection layer is purpose-built for the latest generation of generative AI forgeries.</p>
+    </div>
+
+    <div class="feat-big-grid">
+      <div class="feat-card fade-in">
+        <div class="feat-visual blue">
+          <div class="mini-meter" style="padding:0 20px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+              <span style="font-size:12px;color:var(--ts);">Confidence</span>
+              <span style="font-size:12px;font-weight:600;color:var(--blue);">94.7%</span>
+            </div>
+            <div class="mini-meter-track"><div class="mini-meter-fill" style="width:94.7%;"></div></div>
+          </div>
+        </div>
+        <div class="feat-num">01 — CORE</div>
+        <h3>Facial Manipulation Detection</h3>
+        <p>Identifies face-swaps, expression puppeting, and GAN-generated faces by analyzing 128-point facial geometry, skin texture frequency, and edge coherence.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span class="feat-pill">Face swap</span>
+          <span class="feat-pill">FaceApp edits</span>
+          <span class="feat-pill">GAN faces</span>
+        </div>
+      </div>
+
+      <div class="feat-card fade-in">
+        <div class="feat-visual purple" style="gap:6px;">
+          <div class="mini-bars">
+            <div class="mb sbar f" style="height:60%;background:rgba(155,110,250,0.5);"></div>
+            <div class="mb sbar f" style="height:80%;background:rgba(155,110,250,0.6);"></div>
+            <div class="mb sbar f" style="height:45%;background:rgba(155,110,250,0.45);"></div>
+            <div class="mb sbar f" style="height:90%;background:rgba(155,110,250,0.7);"></div>
+            <div class="mb sbar f" style="height:65%;background:rgba(155,110,250,0.55);"></div>
+            <div class="mb sbar f" style="height:55%;background:rgba(155,110,250,0.5);"></div>
+            <div class="mb sbar f" style="height:75%;background:rgba(155,110,250,0.6);"></div>
+          </div>
+        </div>
+        <div class="feat-num">02 — VIDEO</div>
+        <h3>Temporal Video Analysis</h3>
+        <p>Inspects inter-frame consistency, optical flow anomalies, and compression artifacts across video timelines — catching edits that single-frame methods miss.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span class="feat-pill">MP4 / MOV</span>
+          <span class="feat-pill">Frame delta</span>
+          <span class="feat-pill">Optical flow</span>
+        </div>
+      </div>
+
+      <div class="feat-card fade-in">
+        <div class="feat-visual green">
+          <div style="display:flex;flex-direction:column;gap:5px;width:220px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:11px;color:var(--ts);width:80px;">Formant F1</span>
+              <div style="flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;"><div style="height:4px;width:72%;background:var(--success);border-radius:2px;"></div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:11px;color:var(--ts);width:80px;">Pitch pattern</span>
+              <div style="flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;"><div style="height:4px;width:88%;background:var(--blue);border-radius:2px;"></div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:11px;color:var(--ts);width:80px;">Prosody</span>
+              <div style="flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;"><div style="height:4px;width:55%;background:var(--purple);border-radius:2px;"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="feat-num">03 — AUDIO</div>
+        <h3>Voice Synthesis Detection</h3>
+        <p>Detects AI-cloned voices by analyzing formant distributions, pitch naturalness, prosodic patterns, and GAN audio artifacts — even in noisy environments.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span class="feat-pill">Voice cloning</span>
+          <span class="feat-pill">ElevenLabs</span>
+          <span class="feat-pill">Prosody AI</span>
+        </div>
+      </div>
+
+      <div class="feat-card span2 fade-in">
+        <div class="feat-num">04 — ENSEMBLE</div>
+        <h3>MultiModal Ensemble Model</h3>
+        <p>Our flagship model fuses facial, temporal, audio, and metadata signals through a cross-modal transformer, achieving 98.6% accuracy — the highest in class.</p>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px;">
+          <div style="text-align:center;padding:16px;background:rgba(255,255,255,0.02);border:1px solid var(--glass-b);border-radius:var(--r-md);">
+            <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:700;color:var(--blue);">98.6%</div>
+            <div style="font-size:12px;color:var(--tm);margin-top:4px;">Accuracy</div>
+          </div>
+          <div style="text-align:center;padding:16px;background:rgba(255,255,255,0.02);border:1px solid var(--glass-b);border-radius:var(--r-md);">
+            <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:700;color:var(--purple);">1.4s</div>
+            <div style="font-size:12px;color:var(--tm);margin-top:4px;">Avg. latency</div>
+          </div>
+          <div style="text-align:center;padding:16px;background:rgba(255,255,255,0.02);border:1px solid var(--glass-b);border-radius:var(--r-md);">
+            <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:700;color:var(--success);">4</div>
+            <div style="font-size:12px;color:var(--tm);margin-top:4px;">Signal types</div>
+          </div>
+          <div style="text-align:center;padding:16px;background:rgba(255,255,255,0.02);border:1px solid var(--glass-b);border-radius:var(--r-md);">
+            <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:700;color:var(--warn);">REST</div>
+            <div style="font-size:12px;color:var(--tm);margin-top:4px;">API access</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:40px 0 60px;">
+      <button class="btn-lg primary" onclick="navigate('dashboard')">Try All Features Free →</button>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-logo"><div class="logo-mark" style="width:28px;height:28px;border-radius:8px;"><svg viewBox="0 0 20 20" fill="none" style="width:14px;height:14px;"><circle cx="10" cy="10" r="7" stroke="white" stroke-width="1.5"/><circle cx="10" cy="10" r="3" fill="white"/></svg></div><span>Castellan</span></div>
+    <p>© 2025 Castellan AI. All rights reserved.</p>
+    <div class="footer-links"><a href="#" onclick="navigate('home');return false;">Home</a><a href="#" onclick="navigate('about');return false;">About</a><a href="#" onclick="navigate('contact');return false;">Contact</a></div>
+  </footer>
+</div>
+
+<!-- ════════════════════════════════════════
+     PAGE: ABOUT
+════════════════════════════════════════ -->
+<div class="page" id="page-about">
+  <div class="wrap">
+    <div class="about-hero">
+      <div class="badge-live" style="margin-bottom:20px;"><span class="live-dot"></span>Our mission is active</div>
+      <h1 class="fade-in">Building trust in<br>the age of synthetic media</h1>
+      <p class="fade-in" style="margin-top:16px;">We're a team of AI researchers, journalists, and cybersecurity experts who believe truth matters — and technology should protect it.</p>
+    </div>
+
+    <div class="about-grid" style="margin-bottom:48px;">
+      <div class="about-stat-card fade-in"><div class="about-stat-v">2021</div><div class="about-stat-l">Founded in Bangalore, India</div></div>
+      <div class="about-stat-card fade-in"><div class="about-stat-v">50K+</div><div class="about-stat-l">Active users worldwide</div></div>
+      <div class="about-stat-card fade-in"><div class="about-stat-v">12M+</div><div class="about-stat-l">Files analyzed to date</div></div>
+      <div class="about-stat-card fade-in"><div class="about-stat-v">97.3%</div><div class="about-stat-l">Current detection accuracy</div></div>
+    </div>
+
+    <div class="mission-block fade-in">
+      <h2>Our Mission</h2>
+      <p>Synthetic media — deepfakes, voice clones, AI-generated imagery — is being weaponized for disinformation, fraud, and harassment at unprecedented scale. Castellan exists to give individuals, journalists, and institutions the tools to verify what's real. We believe access to truth-verification technology should be universal, not gatekept behind expensive enterprise contracts.</p>
+    </div>
+
+    <div class="section-header"><h2>The Team</h2><p>Researchers and builders passionate about AI safety.</p></div>
+    <div class="team-grid" style="margin-bottom:56px;">
+      <div class="team-card fade-in"><div class="team-avatar">AK</div><h3>Arjun Kapoor</h3><div class="role">CEO & Co-Founder</div><p>Ex-Google Brain. PhD in Computer Vision from IIT Bombay. 8 years building detection systems.</p></div>
+      <div class="team-card fade-in"><div class="team-avatar">SM</div><h3>Sneha Malhotra</h3><div class="role">Chief Scientist</div><p>Published researcher in GAN forensics. Former DARPA MediFor program contributor.</p></div>
+      <div class="team-card fade-in"><div class="team-avatar">RV</div><h3>Rohan Varma</h3><div class="role">CTO</div><p>ML infrastructure architect. Previously led AI infra at Jio Platforms. MS from Stanford.</p></div>
+    </div>
+
+    <div class="section-header" style="text-align:left;margin-bottom:28px;"><h2>Our Journey</h2></div>
+    <div class="timeline fade-in">
+      <div class="tl-item"><div class="tl-year">2021</div><h3>Founded</h3><p>Castellan started as a research project at IIT Bombay, detecting face swaps in political videos ahead of elections.</p></div>
+      <div class="tl-item"><div class="tl-year">2022</div><h3>Seed Funding & Launch</h3><p>Raised ₹4.2 Cr in seed funding. Launched beta with 500 journalists and fact-checkers.</p></div>
+      <div class="tl-item"><div class="tl-year">2023</div><h3>Audio & Video Models</h3><p>Expanded beyond images to detect AI-synthesized voice and manipulated video. Hit 50,000 users.</p></div>
+      <div class="tl-item"><div class="tl-year">2024</div><h3>MultiModal Ensemble</h3><p>Released flagship 98.6% accuracy model. Partnered with 3 national news agencies for real-time verification.</p></div>
+      <div class="tl-item"><div class="tl-year">2025</div><h3>Today</h3><p>Processing 100,000+ files daily. Building the world's largest verified synthetic media dataset.</p></div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-logo"><div class="logo-mark" style="width:28px;height:28px;border-radius:8px;"><svg viewBox="0 0 20 20" fill="none" style="width:14px;height:14px;"><circle cx="10" cy="10" r="7" stroke="white" stroke-width="1.5"/><circle cx="10" cy="10" r="3" fill="white"/></svg></div><span>Castellan</span></div>
+    <p>© 2025 Castellan AI. All rights reserved.</p>
+    <div class="footer-links"><a href="#" onclick="navigate('home');return false;">Home</a><a href="#" onclick="navigate('features');return false;">Features</a><a href="#" onclick="navigate('contact');return false;">Contact</a></div>
+  </footer>
+</div>
+
+<!-- ════════════════════════════════════════
+     PAGE: CONTACT
+════════════════════════════════════════ -->
+<div class="page" id="page-contact">
+  <div class="wrap">
+    <div class="contact-hero">
+      <div class="badge-live" style="margin-bottom:20px;"><span class="live-dot"></span>Support team online</div>
+      <h1 class="fade-in">Get in Touch</h1>
+      <p class="fade-in" style="margin-top:12px;">Have questions about Castellan? Want to integrate our API? We'd love to hear from you.</p>
+    </div>
+
+    <div class="contact-grid">
+      <div class="contact-form-panel fade-in">
+        <div class="panel-title"><span class="pdot"></span>Send a Message</div>
+        <div class="form-grid2">
+          <div class="form-row"><label>First Name</label><input class="form-input" type="text" placeholder="Arjun" id="c-fname"></div>
+          <div class="form-row"><label>Last Name</label><input class="form-input" type="text" placeholder="Kapoor" id="c-lname"></div>
+        </div>
+        <div class="form-row"><label>Email Address</label><input class="form-input" type="email" placeholder="you@example.com" id="c-email"></div>
+        <div class="form-row">
+          <label>Subject</label>
+          <select class="form-input" id="c-subject">
+            <option value="">Select a topic…</option>
+            <option>General Inquiry</option>
+            <option>API Integration</option>
+            <option>Enterprise Plan</option>
+            <option>Report a Bug</option>
+            <option>Media / Press</option>
+          </select>
+        </div>
+        <div class="form-row"><label>Message</label><textarea class="form-input" placeholder="Tell us how we can help…" id="c-msg"></textarea></div>
+        <button class="btn-primary" style="width:100%;padding:14px;font-size:14px;border-radius:var(--r-md);" onclick="submitContact()">Send Message →</button>
+        <div class="form-success" id="form-success">
+          <div style="font-size:32px;margin-bottom:10px;">✓</div>
+          <h3>Message Sent!</h3>
+          <p>Thanks for reaching out. We'll get back to you within 24 hours.</p>
+        </div>
+      </div>
+
+      <div class="contact-info-side fade-in">
+        <div class="contact-info-card">
+          <div class="ci-icon">📧</div>
+          <div class="ci-title">Email Us</div>
+          <div class="ci-text">For general questions and support requests.</div>
+          <a class="ci-link" href="mailto:hello@Castellan.ai">hello@Castellan.ai</a>
+        </div>
+        <div class="contact-info-card">
+          <div class="ci-icon">💼</div>
+          <div class="ci-title">Enterprise Sales</div>
+          <div class="ci-text">Custom plans for newsrooms, governments, and large teams.</div>
+          <a class="ci-link" href="mailto:enterprise@Castellan.ai">enterprise@Castellan.ai</a>
+        </div>
+        <div class="contact-info-card">
+          <div class="ci-icon">📍</div>
+          <div class="ci-title">Office</div>
+          <div class="ci-text">91Springboard, Koregaon Park,<br>Pune, Maharashtra 411001</div>
+        </div>
+        <div class="contact-info-card">
+          <div class="ci-icon">🕐</div>
+          <div class="ci-title">Support Hours</div>
+          <div class="ci-text">Monday–Friday · 9 AM – 6 PM IST<br>Average response time: &lt;4 hours</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-section">
+      <div class="faq-title">Frequently Asked Questions</div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>Is Castellan free to use?</span><span class="faq-chevron">▾</span></div>
+        <div class="faq-a">Yes — Castellan offers a free tier with up to 20 analyses per month. Paid plans unlock unlimited scans, API access, and priority processing.</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>Are my uploaded files stored?</span><span class="faq-chevron">▾</span></div>
+        <div class="faq-a">Never. Files are analyzed in-memory using an ephemeral processing pipeline and deleted immediately after the scan completes. We do not store, log, or share your media.</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>What file types are supported?</span><span class="faq-chevron">▾</span></div>
+        <div class="faq-a">Images: JPG, PNG, WEBP, GIF, BMP. Videos: MP4, MOV, AVI, MKV (up to 500 MB). Audio: MP3, WAV, M4A, OGG. URL scanning is also available for publicly hosted media.</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>How accurate is the detection?</span><span class="faq-chevron">▾</span></div>
+        <div class="faq-a">Our MultiModal model achieves 98.6% accuracy on standard benchmarks (FaceForensics++, DFDC, WildDeepfake). Individual models range from 91–97.3% depending on media type.</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>Do you offer an API?</span><span class="faq-chevron">▾</span></div>
+        <div class="faq-a">Yes. Our REST API is available on paid plans. You can integrate deepfake detection directly into your product, CMS, or moderation pipeline. Full docs at docs.Castellan.ai.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-logo"><div class="logo-mark" style="width:28px;height:28px;border-radius:8px;"><svg viewBox="0 0 20 20" fill="none" style="width:14px;height:14px;"><circle cx="10" cy="10" r="7" stroke="white" stroke-width="1.5"/><circle cx="10" cy="10" r="3" fill="white"/></svg></div><span>Castellan</span></div>
+    <p>© 2025 Castellan AI. All rights reserved.</p>
+    <div class="footer-links"><a href="#" onclick="navigate('home');return false;">Home</a><a href="#" onclick="navigate('features');return false;">Features</a><a href="#" onclick="navigate('about');return false;">About</a></div>
+  </footer>
+</div>
+
+<!-- ════════════════════════════════════════
+     PAGE: DASHBOARD
+════════════════════════════════════════ -->
+<div class="page" id="page-dashboard">
+  <div class="dash-wrap">
+    <!-- Header -->
+    <div class="dash-header">
+      <div>
+        <div class="badge-live" style="margin-bottom:10px;"><span class="live-dot"></span>AI Engine Active · v3.8.2</div>
+        <h1>Detection Dashboard</h1>
+        <p>Real-time deepfake analysis powered by multimodal neural networks</p>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-ghost">Export Report</button>
+        <button class="btn-primary">+ New Analysis</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card s-blue fade-in"><div class="stat-lbl">Total Analyzed</div><div class="stat-val">12,847</div><div class="stat-sub">↑ 14% this week</div></div>
+      <div class="stat-card s-danger fade-in"><div class="stat-lbl">Deepfakes Found</div><div class="stat-val">1,204</div><div class="stat-sub">9.4% detection rate</div></div>
+      <div class="stat-card s-success fade-in"><div class="stat-lbl">Accuracy Score</div><div class="stat-val">97.3%</div><div class="stat-sub">Above baseline</div></div>
+      <div class="stat-card s-purple fade-in"><div class="stat-lbl">Avg. Scan Time</div><div class="stat-val">1.8s</div><div class="stat-sub">Per file analyzed</div></div>
+    </div>
+
+    <!-- Main grid -->
+    <div class="dash-main">
+      <!-- LEFT -->
+      <div class="dash-left">
+        <!-- Upload Panel -->
+        <div class="panel">
+          <div class="panel-title"><span class="pdot"></span>Upload Media for Analysis</div>
+          <div class="tabs">
+            <button class="tab active" onclick="switchTab(this,'Image')">Image</button>
+            <button class="tab" onclick="switchTab(this,'Video')">Video</button>
+            <button class="tab" onclick="switchTab(this,'Audio')">Audio</button>
+            <button class="tab" onclick="switchTab(this,'URL')">URL</button>
+          </div>
+
+          <div id="upload-area">
+            <div class="upload-zone" id="drop-zone"
+              ondragover="event.preventDefault();this.classList.add('dragover')"
+              ondragleave="this.classList.remove('dragover')"
+              ondrop="handleDrop(event)"
+              onclick="document.getElementById('file-input').click()">
+              <div class="upload-icon-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <defs><linearGradient id="ug" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#4F8EF7"/><stop offset="100%" stop-color="#9B6EFA"/></linearGradient></defs>
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="url(#ug)" stroke-width="1.8"/>
+                  <polyline points="17 8 12 3 7 8" stroke="url(#ug)" stroke-width="1.8"/>
+                  <line x1="12" y1="3" x2="12" y2="15" stroke="url(#ug)" stroke-width="1.8"/>
+                </svg>
+              </div>
+              <h3>Drop your file here</h3>
+              <p>Drag &amp; drop or <span>click to browse</span> to upload for analysis</p>
+              <div class="type-tags">
+                <span class="type-tag">JPG</span><span class="type-tag">PNG</span>
+                <span class="type-tag">MP4</span><span class="type-tag">WAV</span><span class="type-tag">WEBP</span>
+              </div>
+              <button class="btn-primary" style="font-size:14px;padding:11px 28px;" onclick="event.stopPropagation();document.getElementById('file-input').click()">Choose File</button>
+            </div>
+            <input type="file" id="file-input" accept="image/*,video/*,audio/*" onchange="handleFileSelect(event)">
+          </div>
+
+          <!-- URL input area (hidden by default) -->
+          <div id="url-area" style="display:none;">
+            <div style="display:flex;gap:10px;">
+              <input class="form-input" type="url" id="url-input" placeholder="https://example.com/video.mp4" style="flex:1;">
+              <button class="btn-primary" style="padding:12px 20px;border-radius:var(--r-md);" onclick="analyzeUrl()">Scan URL</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Model Selection -->
+        <div class="panel">
+          <div class="panel-title"><span class="pdot"></span>Detection Model</div>
+          <div class="model-grid">
+            <div class="model-card selected" onclick="selectModel(this)"><div class="mc-name">FaceNet-Ultra</div><div class="mc-desc">Facial manipulation</div><div class="mc-acc">97.3% accuracy</div></div>
+            <div class="model-card" onclick="selectModel(this)"><div class="mc-name">VideoGuard</div><div class="mc-desc">Temporal analysis</div><div class="mc-acc">94.8% accuracy</div></div>
+            <div class="model-card" onclick="selectModel(this)"><div class="mc-name">AudioScan</div><div class="mc-desc">Voice synthesis</div><div class="mc-acc">91.2% accuracy</div></div>
+            <div class="model-card" onclick="selectModel(this)"><div class="mc-name">MultiModal</div><div class="mc-desc">Full ensemble</div><div class="mc-acc">98.6% accuracy</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Result Panel -->
+      <div class="panel" id="result-panel">
+        <div class="panel-title"><span class="pdot"></span>Analysis Result</div>
+
+        <!-- Placeholder -->
+        <div class="result-placeholder" id="result-placeholder">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="1.5"/>
+            <circle cx="24" cy="24" r="8" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="24" y1="4" x2="24" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="24" y1="38" x2="24" y2="44" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="4" y1="24" x2="10" y2="24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="38" y1="24" x2="44" y2="24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <p>Upload a file or enter a URL<br>to start the analysis</p>
+        </div>
+
+        <!-- Analyzing -->
+        <div class="analyzing-state" id="analyzing-state">
+          <div class="analyzing-ring"></div>
+          <p id="analyze-step">Initializing AI engine…</p>
+          <div class="progress-track" style="margin:0 24px;"><div class="progress-fill" id="progress-fill"></div></div>
+        </div>
+
+        <!-- Result -->
+        <div class="result-content" id="result-content">
+          <div class="preview-thumb" id="preview-thumb">
+            <div class="preview-scan-line"></div>
+            <div id="face-indicator">
+              <div class="preview-face-box" id="face-box">
+                <span class="preview-face-label" id="face-label">DEEPFAKE</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;">
+            <div>
+              <div style="font-size:13px;color:var(--tm);margin-bottom:4px;" id="res-filename">portrait_edit.jpg</div>
+              <div style="font-size:11px;color:var(--tm);" id="res-meta">4.2 MB · Image</div>
+            </div>
+            <div class="result-badge fake" id="result-badge"><span class="rbdot"></span><span id="badge-text">DEEPFAKE</span></div>
+          </div>
+
+          <div class="conf-block">
+            <div class="conf-header">
+              <span class="conf-lbl">Confidence Score</span>
+              <span class="conf-val fake" id="conf-val">94.7%</span>
+            </div>
+            <div class="meter-track"><div class="meter-fill fake" id="meter-fill" style="width:0%"></div></div>
+          </div>
+
+          <div style="font-size:12px;color:var(--tm);text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px;">Signal Breakdown</div>
+          <div class="signals-list" id="signals-list"></div>
+
+          <div style="border-top:1px solid var(--glass-b);padding-top:18px;display:flex;gap:10px;">
+            <button class="btn-primary" style="flex:1;font-size:13px;padding:10px 0;" onclick="downloadReport()">Download Report</button>
+            <button class="btn-ghost" style="flex:1;font-size:13px;padding:10px 0;" onclick="resetAnalysis()">Scan Another</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom grid -->
+    <div class="dash-bottom">
+      <!-- Recent Detections -->
+      <div class="panel">
+        <div class="panel-title" style="justify-content:space-between;display:flex;align-items:center;margin-bottom:18px;">
+          <span style="display:flex;align-items:center;gap:8px;"><span class="pdot"></span>Recent Detections</span>
+          <a style="font-size:12px;color:var(--blue);cursor:pointer;">View all →</a>
+        </div>
+        <table class="det-table">
+          <thead><tr><th>File</th><th>Type</th><th>Confidence</th><th>Status</th></tr></thead>
+          <tbody id="detections-tbody">
+            <tr><td><div class="file-cell"><div class="ficon vid">🎬</div><div><div class="fname">interview_clip.mp4</div><div class="fsize">18.4 MB</div></div></div></td><td><span style="color:var(--tm);font-size:12px;">Video</span></td><td><span style="font-weight:600;color:var(--danger);font-size:13px;">96.1%</span></td><td><span class="pill fake"><span class="pdot2"></span>Fake</span></td></tr>
+            <tr><td><div class="file-cell"><div class="ficon img">🖼️</div><div><div class="fname">selfie_2024.jpg</div><div class="fsize">2.1 MB</div></div></div></td><td><span style="color:var(--tm);font-size:12px;">Image</span></td><td><span style="font-weight:600;color:var(--success);font-size:13px;">3.2%</span></td><td><span class="pill real"><span class="pdot2"></span>Real</span></td></tr>
+            <tr><td><div class="file-cell"><div class="ficon aud">🎙️</div><div><div class="fname">voice_memo.wav</div><div class="fsize">1.8 MB</div></div></div></td><td><span style="color:var(--tm);font-size:12px;">Audio</span></td><td><span style="font-weight:600;color:var(--warn);font-size:13px;">—</span></td><td><span class="pill scan"><span class="pdot2"></span>Scanning</span></td></tr>
+            <tr><td><div class="file-cell"><div class="ficon img">🖼️</div><div><div class="fname">profile_photo.png</div><div class="fsize">3.6 MB</div></div></div></td><td><span style="color:var(--tm);font-size:12px;">Image</span></td><td><span style="font-weight:600;color:var(--danger);font-size:13px;">89.3%</span></td><td><span class="pill fake"><span class="pdot2"></span>Fake</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Weekly + Performance -->
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <div class="panel" style="flex:1;">
+          <div class="panel-title"><span class="pdot"></span>Weekly Activity</div>
+          <div style="display:flex;gap:24px;margin-bottom:16px;">
+            <div><div style="font-size:11px;color:var(--tm);margin-bottom:2px;">Fakes detected</div><div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--danger);">248</div></div>
+            <div><div style="font-size:11px;color:var(--tm);margin-bottom:2px;">Authentic</div><div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--success);">1,840</div></div>
+          </div>
+          <div class="spark-wrap">
+            <div class="sbar f" style="height:38%"></div><div class="sbar f" style="height:55%"></div>
+            <div class="sbar f" style="height:43%"></div><div class="sbar f" style="height:70%"></div>
+            <div class="sbar f" style="height:52%"></div><div class="sbar f" style="height:90%"></div>
+            <div class="sbar f" style="height:62%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px;">
+            <span style="font-size:11px;color:var(--tm);">Mon</span><span style="font-size:11px;color:var(--tm);">Tue</span>
+            <span style="font-size:11px;color:var(--tm);">Wed</span><span style="font-size:11px;color:var(--tm);">Thu</span>
+            <span style="font-size:11px;color:var(--tm);">Fri</span><span style="font-size:11px;color:var(--tm);">Sat</span>
+            <span style="font-size:11px;color:var(--tm);">Sun</span>
+          </div>
+        </div>
+
+        <div class="panel" style="flex:1;">
+          <div class="panel-title"><span class="pdot"></span>Model Performance</div>
+          <div style="display:flex;align-items:center;gap:20px;">
+            <div class="donut-wrap">
+              <svg viewBox="0 0 100 100" width="100" height="100">
+                <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="10"/>
+                <circle cx="50" cy="50" r="38" fill="none" stroke="url(#dg)" stroke-width="10"
+                  stroke-dasharray="214" stroke-dashoffset="27" stroke-linecap="round">
+                  <defs><linearGradient id="dg" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#4F8EF7"/><stop offset="100%" stop-color="#9B6EFA"/></linearGradient></defs>
+                </circle>
+              </svg>
+              <div class="donut-lbl"><span class="donut-pct">97%</span><span class="donut-sub">accuracy</span></div>
+            </div>
+            <div style="flex:1;">
+              <div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:12px;color:var(--ts)">Precision</span><span style="font-size:12px;font-weight:600;color:var(--blue)">96.8%</span></div><div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;"><div style="height:4px;width:96.8%;background:var(--blue);border-radius:2px;"></div></div></div>
+              <div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:12px;color:var(--ts)">Recall</span><span style="font-size:12px;font-weight:600;color:var(--purple)">97.9%</span></div><div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;"><div style="height:4px;width:97.9%;background:var(--purple);border-radius:2px;"></div></div></div>
+              <div><div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:12px;color:var(--ts)">F1 Score</span><span style="font-size:12px;font-weight:600;color:var(--success)">97.3%</span></div><div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;"><div style="height:4px;width:97.3%;background:var(--success);border-radius:2px;"></div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-logo"><div class="logo-mark" style="width:28px;height:28px;border-radius:8px;"><svg viewBox="0 0 20 20" fill="none" style="width:14px;height:14px;"><circle cx="10" cy="10" r="7" stroke="white" stroke-width="1.5"/><circle cx="10" cy="10" r="3" fill="white"/></svg></div><span>Castellan</span></div>
+    <p>© 2025 Castellan AI. All rights reserved.</p>
+    <div class="footer-links"><a href="#" onclick="navigate('home');return false;">Home</a><a href="#" onclick="navigate('features');return false;">Features</a><a href="#" onclick="navigate('about');return false;">About</a></div>
+  </footer>
+</div>
+
+<!-- ════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════ -->
+<script>
+/* ── Navigation ── */
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.nav-links button').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('nav-' + page);
+  if (btn) btn.classList.add('active');
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+/* ── Tabs ── */
+function switchTab(el, type) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  const uploadArea = document.getElementById('upload-area');
+  const urlArea = document.getElementById('url-area');
+  if (type === 'URL') { uploadArea.style.display = 'none'; urlArea.style.display = 'block'; }
+  else { uploadArea.style.display = 'block'; urlArea.style.display = 'none'; }
+  const tagMap = {
+    Image: ['JPG','PNG','WEBP','GIF','BMP'],
+    Video: ['MP4','MOV','AVI','MKV'],
+    Audio: ['MP3','WAV','M4A','OGG'],
+    URL:   ['HTTP','HTTPS','YouTube','Direct link']
+  };
+  const tags = document.querySelector('.type-tags');
+  if (tags) tags.innerHTML = (tagMap[type]||[]).map(t=>`<span class="type-tag">${t}</span>`).join('');
+}
+
+/* ── Model select ── */
+function selectModel(el) {
+  document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+/* ── File handling ── */
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) startAnalysis(file);
+}
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) startAnalysis(file);
+}
+function analyzeUrl() {
+  const val = document.getElementById('url-input').value.trim();
+  if (!val) return;
+  startAnalysis({name: val.split('/').pop() || 'media_file', size: 0, type: 'url', isUrl: true});
+}
+
+/* ── Core analysis simulation ── */
+function startAnalysis(file) {
+  const placeholder = document.getElementById('result-placeholder');
+  const analyzing = document.getElementById('analyzing-state');
+  const content = document.getElementById('result-content');
+  placeholder.style.display = 'none';
+  analyzing.style.display = 'block';
+  content.style.display = 'none';
+
+  const steps = [
+    'Initializing AI engine…',
+    'Extracting facial landmarks…',
+    'Analyzing texture frequencies…',
+    'Running temporal consistency check…',
+    'Cross-referencing signal patterns…',
+    'Generating confidence score…',
+    'Analysis complete!'
+  ];
+  let step = 0;
+  const fill = document.getElementById('progress-fill');
+  const stepEl = document.getElementById('analyze-step');
+
+  const iv = setInterval(() => {
+    if (step >= steps.length) {
+      clearInterval(iv);
+      showResult(file);
+      return;
+    }
+    stepEl.textContent = steps[step];
+    fill.style.width = (((step+1)/steps.length)*100) + '%';
+    step++;
+  }, 480);
+}
+
+function showResult(file) {
+  const analyzing = document.getElementById('analyzing-state');
+  const content = document.getElementById('result-content');
+  analyzing.style.display = 'none';
+  content.style.display = 'block';
+
+  // Simulate detection: randomize fake/real (70% chance fake for demo)
+  const isFake = Math.random() > 0.3;
+  const confidence = isFake
+    ? (75 + Math.random()*23).toFixed(1)
+    : (2 + Math.random()*18).toFixed(1);
+
+  // Update filename / meta
+  const sizeStr = file.size ? (file.size / (1024*1024)).toFixed(1) + ' MB' : '~';
+  const typeStr = file.type ? file.type.split('/')[0].charAt(0).toUpperCase() + file.type.split('/')[0].slice(1) : 'Media';
+  document.getElementById('res-filename').textContent = file.name || 'uploaded_file';
+  document.getElementById('res-meta').textContent = sizeStr + ' · ' + typeStr;
+
+  // Badge
+  const badge = document.getElementById('result-badge');
+  const badgeText = document.getElementById('badge-text');
+  const confVal = document.getElementById('conf-val');
+  const meterFill = document.getElementById('meter-fill');
+  const faceBox = document.getElementById('face-box');
+  const faceLabel = document.getElementById('face-label');
+
+  badge.className = 'result-badge ' + (isFake ? 'fake' : 'real');
+  badgeText.textContent = isFake ? 'DEEPFAKE' : 'AUTHENTIC';
+  confVal.className = 'conf-val ' + (isFake ? 'fake' : 'real');
+  confVal.textContent = confidence + '%';
+  meterFill.className = 'meter-fill ' + (isFake ? 'fake' : 'real');
+
+  faceBox.className = 'preview-face-box' + (isFake ? '' : ' real-box');
+  faceLabel.className = 'preview-face-label' + (isFake ? '' : ' real-lbl');
+  faceLabel.textContent = isFake ? 'DEEPFAKE' : 'AUTHENTIC';
+
+  setTimeout(() => { meterFill.style.width = confidence + '%'; }, 100);
+
+  // Signals
+  const signals = isFake
+    ? [
+        {name:'Facial geometry', pct: Math.round(75+Math.random()*20), cls:'h'},
+        {name:'Texture artifacts', pct: Math.round(65+Math.random()*25), cls:'h'},
+        {name:'Edge blending', pct: Math.round(50+Math.random()*30), cls:'m'},
+        {name:'Lighting coherence', pct: Math.round(40+Math.random()*30), cls:'m'},
+        {name:'Metadata integrity', pct: Math.round(5+Math.random()*25), cls:'l'},
+      ]
+    : [
+        {name:'Facial geometry', pct: Math.round(2+Math.random()*10), cls:'l'},
+        {name:'Texture artifacts', pct: Math.round(1+Math.random()*12), cls:'l'},
+        {name:'Edge blending', pct: Math.round(3+Math.random()*15), cls:'l'},
+        {name:'Lighting coherence', pct: Math.round(2+Math.random()*10), cls:'l'},
+        {name:'Metadata integrity', pct: Math.round(1+Math.random()*8), cls:'l'},
+      ];
+
+  const sigList = document.getElementById('signals-list');
+  sigList.innerHTML = signals.map(s => `
+    <div class="sig-row">
+      <span class="sig-name">${s.name}</span>
+      <div class="sig-bar-wrap"><div class="sig-bar ${s.cls}" style="width:${s.pct}%"></div></div>
+      <span class="sig-pct">${s.pct}%</span>
+    </div>
+  `).join('');
+
+  // Add to detections table
+  addToHistory(file, isFake, confidence);
+}
+
+function addToHistory(file, isFake, confidence) {
+  const tbody = document.getElementById('detections-tbody');
+  const type = file.type ? file.type.split('/')[0] : 'file';
+  const iconMap = {video:'vid',image:'img',audio:'aud'};
+  const emojiMap = {video:'🎬',image:'🖼️',audio:'🎙️'};
+  const cls = iconMap[type] || 'img';
+  const em = emojiMap[type] || '📄';
+  const sizeStr = file.size ? (file.size/(1024*1024)).toFixed(1)+' MB' : '~';
+  const confColor = isFake ? 'var(--danger)' : 'var(--success)';
+  const pillClass = isFake ? 'fake' : 'real';
+  const pillLabel = isFake ? 'Fake' : 'Real';
+
+  const row = document.createElement('tr');
+  row.innerHTML = `
+    <td><div class="file-cell"><div class="ficon ${cls}">${em}</div><div><div class="fname">${file.name||'file'}</div><div class="fsize">${sizeStr}</div></div></div></td>
+    <td><span style="color:var(--tm);font-size:12px;">${type.charAt(0).toUpperCase()+type.slice(1)||'File'}</span></td>
+    <td><span style="font-weight:600;color:${confColor};font-size:13px;">${confidence}%</span></td>
+    <td><span class="pill ${pillClass}"><span class="pdot2"></span>${pillLabel}</span></td>
+  `;
+  tbody.insertBefore(row, tbody.firstChild);
+  // Keep max 6 rows
+  while(tbody.rows.length > 6) tbody.deleteRow(tbody.rows.length-1);
+}
+
+function resetAnalysis() {
+  document.getElementById('result-content').style.display = 'none';
+  document.getElementById('result-placeholder').style.display = 'flex';
+  document.getElementById('file-input').value = '';
+  document.getElementById('progress-fill').style.width = '0%';
+}
+
+function downloadReport() {
+  const name = document.getElementById('res-filename').textContent;
+  const badge = document.getElementById('badge-text').textContent;
+  const conf = document.getElementById('conf-val').textContent;
+  const content = `Castellan Analysis Report\n===========================\n\nFile: ${name}\nVerdict: ${badge}\nConfidence: ${conf}\nModel: ${document.querySelector('.model-card.selected .mc-name').textContent}\nDate: ${new Date().toLocaleString()}\n\nThis report was generated by Castellan AI v3.8.2\nhttps://Castellan.ai`;
+  const blob = new Blob([content], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Castellan_report_' + Date.now() + '.txt';
+  a.click();
+}
+
+/* ── Contact form ── */
+function submitContact() {
+  const fname = document.getElementById('c-fname').value.trim();
+  const email = document.getElementById('c-email').value.trim();
+  const msg = document.getElementById('c-msg').value.trim();
+  if (!fname || !email || !msg) {
+    alert('Please fill in Name, Email, and Message fields.');
+    return;
+  }
+  document.getElementById('form-success').classList.add('show');
+  document.getElementById('c-fname').value = '';
+  document.getElementById('c-lname').value = '';
+  document.getElementById('c-email').value = '';
+  document.getElementById('c-subject').value = '';
+  document.getElementById('c-msg').value = '';
+}
+
+/* ── FAQ ── */
+function toggleFaq(el) {
+  const wasOpen = el.classList.contains('open');
+  document.querySelectorAll('.faq-item').forEach(f => f.classList.remove('open'));
+  if (!wasOpen) el.classList.add('open');
+}
+</script>
+</body>
+</html>
