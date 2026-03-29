@@ -55,7 +55,8 @@ export default function Dashboard({ user }) {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const response = await axios.post('http://localhost:8000/analyze', formData, {
+      // Use 127.0.0.1 instead of localhost to avoid IPv6 issues on Windows
+      const response = await axios.post('http://127.0.0.1:8000/analyze', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 120000,
       });
@@ -65,7 +66,12 @@ export default function Dashboard({ user }) {
       setStatus('done');
     } catch (err) {
       clearInterval(progressInterval);
-      setError(err.response?.data?.detail || err.message || 'Analysis failed. Please try again.');
+      console.error('Analysis error:', err);
+      const errMsg = err.response?.data?.detail 
+        || err.response?.data?.error 
+        || err.message 
+        || 'Analysis failed. Please ensure the backend is running at http://127.0.0.1:8000';
+      setError(errMsg);
       setStatus('error');
     }
   }, [file]);

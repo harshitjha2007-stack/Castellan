@@ -71,7 +71,12 @@ async def detect(file: UploadFile = File(...)):
     try:
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        logger.info(f"Uploaded: {file.filename} ({os.path.getsize(file_path) / 1024:.1f} KB)")
+        
+        file_size = os.path.getsize(file_path)
+        logger.info(f"--- New Analysis Request ---")
+        logger.info(f"File: {file.filename}")
+        logger.info(f"Size: {file_size / 1024:.1f} KB")
+        logger.info(f"ID: {file_id}")
         
         # Run external script
         logger.info("Executing deepfakesONphys/run.py subprocess...")
@@ -111,4 +116,5 @@ async def detect(file: UploadFile = File(...)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    # Listening on 127.0.0.1 is often more reliable on Windows for localhost access
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")

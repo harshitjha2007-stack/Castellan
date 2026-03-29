@@ -12,6 +12,23 @@ export default function LandingPage({ user }) {
   const goToDashboard = () => navigate(user ? '/dashboard' : '/login');
   const toggleFaq = (idx) => setOpenFaq(openFaq === idx ? null : idx);
 
+  const scrollToSection = (e, id) => {
+    e.preventDefault();
+    const element = document.getElementById(id);
+    if (element) {
+      const offset = 80; // height of the fixed nav
+      const bodyRect = document.body.getBoundingClientRect().top;
+      const elementRect = element.getBoundingClientRect().top;
+      const elementPosition = elementRect - bodyRect;
+      const offsetPosition = elementPosition - offset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   const faqs = [
     { q: 'What file types are supported?', a: 'Images: JPG, PNG, WEBP, BMP. Videos: MP4, MOV, AVI, MKV, WEBM. The system extracts frames and analyzes facial regions using our multi-signal pipeline.' },
     { q: 'How does the detection work?', a: 'We use 5 analysis signals: CNN feature extraction (ResNet18), frequency domain analysis (FFT spectrum), noise pattern analysis, edge consistency checks, and color anomaly detection. For videos, rPPG biological signal analysis adds heart rate validation.' },
@@ -40,10 +57,10 @@ export default function LandingPage({ user }) {
           <span className="logo-txt">Castellan</span>
         </div>
         <ul className="nav-links">
-          <li><a href="#home" className="nav-link-btn active">Home</a></li>
-          <li><a href="#how-it-works" className="nav-link-btn">How It Works</a></li>
-          <li><a href="#technology" className="nav-link-btn">Technology</a></li>
-          <li><a href="#faq" className="nav-link-btn">FAQ</a></li>
+          <li><a href="#home" className="nav-link-btn active" onClick={(e) => scrollToSection(e, 'home')}>Home</a></li>
+          <li><a href="#how-it-works" className="nav-link-btn" onClick={(e) => scrollToSection(e, 'how-it-works')}>How It Works</a></li>
+          <li><a href="#technology" className="nav-link-btn" onClick={(e) => scrollToSection(e, 'technology')}>Technology</a></li>
+          <li><a href="#faq" className="nav-link-btn" onClick={(e) => scrollToSection(e, 'faq')}>FAQ</a></li>
         </ul>
         <div className="nav-cta">
           <button className="btn-ghost" onClick={goToDashboard}>Dashboard</button>
@@ -64,7 +81,7 @@ export default function LandingPage({ user }) {
         </p>
         <div className="hero-btns fade-in">
           <button className="btn-lg primary" onClick={goToDashboard}>Try It Now — Free</button>
-          <a href="#how-it-works" className="btn-lg ghost">See How It Works</a>
+          <a href="#how-it-works" className="btn-lg ghost" onClick={(e) => scrollToSection(e, 'how-it-works')}>See How It Works</a>
         </div>
 
         <div className="hero-visual fade-in">
@@ -239,10 +256,10 @@ export default function LandingPage({ user }) {
         </div>
         <p>Hybrid Deepfake Detection System · CNN + rPPG</p>
         <div className="footer-links">
-          <a href="#home">Home</a>
-          <a href="#how-it-works">How It Works</a>
-          <a href="#technology">Technology</a>
-          <a href="#faq">FAQ</a>
+          <a href="#home" onClick={(e) => scrollToSection(e, 'home')}>Home</a>
+          <a href="#how-it-works" onClick={(e) => scrollToSection(e, 'how-it-works')}>How It Works</a>
+          <a href="#technology" onClick={(e) => scrollToSection(e, 'technology')}>Technology</a>
+          <a href="#faq" onClick={(e) => scrollToSection(e, 'faq')}>FAQ</a>
         </div>
       </footer>
     </div>
